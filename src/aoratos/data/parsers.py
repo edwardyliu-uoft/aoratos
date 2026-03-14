@@ -67,7 +67,7 @@ def iterate_kv(file_path: Path) -> Iterator[ParsedKVRecord]:
                 raise DataError(f"Found data row before movie header in {file_path}")
 
             parts = line.split(",")
-            if len(parts) != 1:
+            if len(parts) not in [1, 2]:
                 raise DataError(f"Unexpected KV row format in {file_path}: {line}")
 
             customer_id = int(parts[0])
@@ -98,20 +98,34 @@ def kv_to_dataframe(records: list[ParsedKVRecord]) -> pd.DataFrame:
 
 def read_movies_csv(movie_file: Path) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    with movie_file.open("r", encoding="latin-1", newline="") as f:
-        reader = csv.reader(f)
-        for row in reader:
-            if len(row) < 3:
-                continue
-            movie_id = int(row[0])
-            year = pd.NA
-            if row[1].strip():
-                try:
-                    year = int(row[1])
-                except ValueError:
+    decode_error: UnicodeDecodeError | None = None
+    decoded = False
+    for encoding in ("utf-8", "cp1252", "latin-1"):
+        try:
+            with movie_file.open("r", encoding=encoding, newline="") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) < 3:
+                        continue
+                    movie_id = int(row[0])
                     year = pd.NA
-            title = ",".join(row[2:])
-            rows.append({"movie_id": movie_id, "year": year, "title": title})
+                    if row[1].strip():
+                        try:
+                            year = int(row[1])
+                        except ValueError:
+                            year = pd.NA
+                    title = ",".join(row[2:])
+                    rows.append({"movie_id": movie_id, "year": year, "title": title})
+            decoded = True
+            break
+        except UnicodeDecodeError as exc:
+            rows = []
+            decode_error = exc
+
+    if not decoded and decode_error is not None:
+        raise DataError(
+            f"Could not decode movie titles file {movie_file} with supported encodings"
+        ) from decode_error
 
     df = pd.DataFrame(rows)
     if not df.empty:

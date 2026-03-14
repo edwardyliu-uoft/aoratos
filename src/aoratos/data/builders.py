@@ -18,19 +18,6 @@ from .paths import ensure_dir, resolve_path
 from .reader import read
 
 
-def _normalize_columns(dataframe: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
-    normalized = dataframe.copy()
-
-    for column in columns:
-        if column in {"movie_id", "customer_id"} and column in normalized.columns:
-            normalized[column] = pd.to_numeric(
-                normalized[column],
-                errors="coerce",
-            ).astype("Int64")
-
-    return normalized
-
-
 def build_train(
     source_dir: Path | str | None = None,
     target_dir: Path | str | None = None,
@@ -47,23 +34,14 @@ def build_train(
     if target_file.exists() and not force:
         return read("train", "train")
 
-    qualifying_df = _normalize_columns(
-        read("qualifying", "compressed"),
-        ["movie_id", "customer_id"],
-    )
-    ratings_df = _normalize_columns(
-        read("ratings", "compressed"),
-        ["movie_id", "customer_id"],
-    )
-    movies_df = _normalize_columns(
-        read("movies", "compressed"),
-        ["movie_id"],
-    )
+    ratings_df = read("ratings", "compressed")
+    probe_df = read("probe", "compressed")
+    movies_df = read("movies", "compressed")
 
-    train_df = qualifying_df.merge(
-        ratings_df,
+    train_df = ratings_df.merge(
+        probe_df,
         on=["movie_id", "customer_id"],
-        how="left",
+        how="left_anti",
         sort=False,
     )
     train_df = train_df.merge(movies_df, on="movie_id", how="left", sort=False)
@@ -92,18 +70,9 @@ def build_test(
     if target_file.exists() and not force:
         return read("test", "test")
 
-    probe_df = _normalize_columns(
-        read("probe", "compressed"),
-        ["movie_id", "customer_id"],
-    )
-    ratings_df = _normalize_columns(
-        read("ratings", "compressed"),
-        ["movie_id", "customer_id"],
-    )
-    movies_df = _normalize_columns(
-        read("movies", "compressed"),
-        ["movie_id"],
-    )
+    probe_df = read("probe", "compressed")
+    ratings_df = read("ratings", "compressed")
+    movies_df = read("movies", "compressed")
 
     test_df = probe_df.merge(
         ratings_df,

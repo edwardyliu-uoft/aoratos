@@ -19,8 +19,8 @@ def test_safe_save_name_rejects_unsafe_values() -> None:
 
 def test_save_overwrites_file(tmp_path: Path) -> None:
     root = tmp_path / "savepoints"
-    save(pd.DataFrame({"v": [1]}), "checkpoint", savepoints_root=root)
-    save(pd.DataFrame({"v": [2]}), "checkpoint", savepoints_root=root)
+    save(pd.DataFrame({"v": [1]}), "checkpoint", target_dir=root)
+    save(pd.DataFrame({"v": [2]}), "checkpoint", target_dir=root)
 
     loaded = pd.read_parquet(root / "checkpoint.parquet")
     assert loaded["v"].tolist() == [2]

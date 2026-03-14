@@ -27,14 +27,18 @@ def test_read_parquet_dir_and_find_matches(tmp_path: Path) -> None:
     assert len(matches) == 1
 
 
-def test_read_folder_precedence_and_errors(tmp_path: Path) -> None:
+def test_read_folder_precedence_and_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
+
     root = tmp_path / "compressed"
     ratings = root / "ratings"
     ratings.mkdir(parents=True)
     pd.DataFrame({"x": [1]}).to_parquet(ratings / "a.parquet", index=False)
     pd.DataFrame({"x": [9]}).to_parquet(root / "ratings.parquet", index=False)
 
-    folder_df = read("ratings", source="compressed", compressed_root=root)
+    folder_df = read("ratings", source="compressed")
     assert folder_df["x"].tolist() == [1]
 
     (root / "a").mkdir(parents=True, exist_ok=True)
@@ -42,16 +46,20 @@ def test_read_folder_precedence_and_errors(tmp_path: Path) -> None:
     pd.DataFrame({"x": [1]}).to_parquet(root / "a" / "dup.parquet", index=False)
     pd.DataFrame({"x": [2]}).to_parquet(root / "b" / "dup.parquet", index=False)
     with pytest.raises(DataAmbiguityError):
-        read("dup", source="compressed", compressed_root=root)
+        read("dup", source="compressed")
 
     with pytest.raises(DataNotFoundError):
-        read("missing", source="compressed", compressed_root=root)
+        read("missing", source="compressed")
 
     with pytest.raises(ValueError):
-        read("ratings", source="invalid", compressed_root=root)
+        read("ratings", source="invalid")
 
 
-def test_read_train_and_test_sources(tmp_path: Path) -> None:
+def test_read_train_and_test_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
+
     train_root = tmp_path / "train"
     test_root = tmp_path / "test"
     train_root.mkdir(parents=True)
@@ -64,8 +72,8 @@ def test_read_train_and_test_sources(tmp_path: Path) -> None:
         test_root / "test.parquet", index=False
     )
 
-    train_df = read("train", source="train", train_root=train_root)
-    test_df = read("test", source="test", test_root=test_root)
+    train_df = read("train", source="train")
+    test_df = read("test", source="test")
 
     assert train_df["movie_id"].tolist() == [1]
     assert test_df["movie_id"].tolist() == [2]

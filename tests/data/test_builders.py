@@ -7,10 +7,14 @@ import pandas as pd
 from aoratos.data.builders import build_test, build_train
 
 
-def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
+def test_build_train_and_test_from_parquet(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
+
     compressed = tmp_path / "compressed"
     (compressed / "ratings").mkdir(parents=True)
-    pd.DataFrame([{"movie_id": 1, "customer_id": 10, "date": "2005-01-01"}]).to_parquet(
+    pd.DataFrame([{"movie_id": 1, "customer_id": 10}]).to_parquet(
         compressed / "qualifying.parquet", index=False
     )
     pd.DataFrame([{"movie_id": 1, "customer_id": 11}]).to_parquet(
@@ -28,8 +32,8 @@ def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
 
     train_out = tmp_path / "train"
     test_out = tmp_path / "test"
-    train_df = build_train(compressed_root=compressed, out_dir=train_out, force=True)
-    test_df = build_test(compressed_root=compressed, out_dir=test_out, force=True)
+    train_df = build_train(source_dir=compressed, target_dir=train_out, force=True)
+    test_df = build_test(source_dir=compressed, target_dir=test_out, force=True)
 
     assert (train_out / "train.parquet").exists()
     assert (test_out / "test.parquet").exists()
@@ -41,29 +45,39 @@ def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
     )
 
 
-def test_builders_fallback_to_raw_and_idempotent(
-    fixture_raw_dir: Path, tmp_path: Path
+def test_build_train_idempotent_when_output_exists(
+    tmp_path: Path, monkeypatch
 ) -> None:
-    base = tmp_path / "data"
-    raw = base / "raw"
-    raw.mkdir(parents=True)
-    for p in fixture_raw_dir.iterdir():
-        (raw / p.name).write_bytes(p.read_bytes())
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
 
-    compressed = base / "compressed"
-    train_out = base / "train"
+    compressed = tmp_path / "compressed"
+    (compressed / "ratings").mkdir(parents=True)
+    pd.DataFrame([{"movie_id": 1, "customer_id": 10}]).to_parquet(
+        compressed / "qualifying.parquet", index=False
+    )
+    pd.DataFrame([{"movie_id": 1, "year": 2001, "title": "Movie One"}]).to_parquet(
+        compressed / "movies.parquet", index=False
+    )
+    pd.DataFrame(
+        [{"movie_id": 1, "customer_id": 10, "rating": 5, "date": "2005-01-01"}]
+    ).to_parquet(compressed / "ratings" / "ratings_part_000.parquet", index=False)
 
-    first = build_train(compressed_root=compressed, out_dir=train_out, force=True)
-    second = build_train(compressed_root=compressed, out_dir=train_out, force=False)
+    train_out = tmp_path / "train"
+    first = build_train(source_dir=compressed, target_dir=train_out, force=True)
+    second = build_train(source_dir=compressed, target_dir=train_out, force=False)
     assert len(first) == len(second)
 
 
-def test_build_train_matches_ratings_when_date_dtype_differs(tmp_path: Path) -> None:
+def test_build_train_matches_ratings_when_join_key_dtype_differs(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
+
     compressed = tmp_path / "compressed"
     (compressed / "ratings").mkdir(parents=True)
 
     pd.DataFrame(
-        [{"movie_id": 1, "customer_id": 10, "date": pd.Timestamp("2005-01-01")}]
+        [{"movie_id": "1", "customer_id": "10"}]
     ).to_parquet(compressed / "qualifying.parquet", index=False)
     pd.DataFrame(
         [{"movie_id": 1, "year": 2001, "title": "Movie One"}]
@@ -73,7 +87,7 @@ def test_build_train_matches_ratings_when_date_dtype_differs(tmp_path: Path) -> 
     ).to_parquet(compressed / "ratings" / "ratings_part_000.parquet", index=False)
 
     out_dir = tmp_path / "train"
-    train_df = build_train(compressed_root=compressed, out_dir=out_dir, force=True)
+    train_df = build_train(source_dir=compressed, target_dir=out_dir, force=True)
 
     assert train_df.shape[0] == 1
     assert train_df["rating"].isnull().sum() == 0

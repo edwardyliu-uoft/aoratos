@@ -13,7 +13,7 @@ def test_download_requires_kaggle_token(
 ) -> None:
     monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
     with pytest.raises(DataError):
-        download(raw_root=tmp_path / "raw", force=True)
+        download(target_dir=tmp_path / "raw", force=True)
 
 
 def test_download_skips_when_raw_already_present(
@@ -22,10 +22,10 @@ def test_download_skips_when_raw_already_present(
 ) -> None:
     monkeypatch.delenv("KAGGLE_API_TOKEN", raising=False)
 
-    def _fail_download(_raw: Path, _slug: str) -> Path:
+    def _fail_download(_slug: str, _target_dir: Path) -> Path:
         raise AssertionError("downloader should not be called")
 
-    out = download(raw_root=fixture_raw_dir, download_archive_fn=_fail_download)
+    out = download(target_dir=fixture_raw_dir, download_fn=_fail_download)
     assert out == fixture_raw_dir
 
 
@@ -39,7 +39,7 @@ def test_download_uses_injected_downloader_and_extractor(
 
     called = {"download": False, "extract": False}
 
-    def _download(_raw: Path, _slug: str) -> Path:
+    def _download(_slug: str, _target_dir: Path) -> Path:
         called["download"] = True
         return fixture_archive
 
@@ -51,10 +51,10 @@ def test_download_uses_injected_downloader_and_extractor(
             zf.extractall(target)
 
     download(
-        raw_root=raw,
+        target_dir=raw,
         force=True,
-        download_archive_fn=_download,
-        extract_archive_fn=_extract,
+        download_fn=_download,
+        extract_fn=_extract,
     )
     assert called == {"download": True, "extract": True}
     assert (raw / "movie_titles.csv").exists()

@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from aoratos.data.paths import (
-    compressed_outputs_present,
-    default_raw_root_from_compressed,
+    compressed_tables_exist,
     ensure_dir,
-    raw_files_present,
+    files_exist,
     resolve_path,
 )
+from aoratos.data.constants import REQUIRED_RAW_FILENAMES
 
 
 def test_resolve_path_and_ensure_dir(tmp_path: Path) -> None:
@@ -23,16 +23,16 @@ def test_resolve_path_and_ensure_dir(tmp_path: Path) -> None:
     assert out.exists() and out.is_dir()
 
 
-def test_raw_files_present(fixture_raw_dir: Path, tmp_path: Path) -> None:
-    assert raw_files_present(fixture_raw_dir)
+def test_files_exist(fixture_raw_dir: Path, tmp_path: Path) -> None:
+    assert files_exist(fixture_raw_dir, REQUIRED_RAW_FILENAMES)
 
     incomplete = tmp_path / "incomplete"
     incomplete.mkdir()
     (incomplete / "combined_data_1.txt").write_text("", encoding="utf-8")
-    assert not raw_files_present(incomplete)
+    assert not files_exist(incomplete, REQUIRED_RAW_FILENAMES)
 
 
-def test_compressed_outputs_present(tmp_path: Path) -> None:
+def test_compressed_tables_exist(tmp_path: Path) -> None:
     root = tmp_path / "compressed"
     ratings = root / "ratings"
     ratings.mkdir(parents=True)
@@ -40,6 +40,4 @@ def test_compressed_outputs_present(tmp_path: Path) -> None:
     (root / "movies.parquet").write_text("x", encoding="utf-8")
     (root / "probe.parquet").write_text("x", encoding="utf-8")
     (root / "qualifying.parquet").write_text("x", encoding="utf-8")
-    assert compressed_outputs_present(root)
-
-    assert default_raw_root_from_compressed(root) == root.parent / "raw"
+    assert compressed_tables_exist(root)

@@ -19,11 +19,11 @@ def write_fixture_raw_files(target: Path) -> None:
     (target / "combined_data_3.txt").write_text("", encoding="utf-8")
     (target / "combined_data_4.txt").write_text("", encoding="utf-8")
     (target / "qualifying.txt").write_text(
-        "1:\n10,2005-01-01\n2:\n12,2005-01-03\n",
+        "1:\n10\n2:\n12\n",
         encoding="utf-8",
     )
     (target / "probe.txt").write_text(
-        "1:\n11\n3:\n13\n",
+        "1:\n11\n3:\n13,2005-01-04\n",
         encoding="utf-8",
     )
     (target / "movie_titles.csv").write_text(
