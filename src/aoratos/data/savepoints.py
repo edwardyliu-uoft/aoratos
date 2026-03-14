@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .constants import DEFAULT_SAVEPOINT_ROOT
+from .constants import DEFAULT_SAVEPOINTS_DIR
 from .errors import UnsafeNameError
 from .paths import ensure_dir, resolve_path
 
@@ -18,15 +18,19 @@ def safe_save_name(name: str) -> str:
 
 
 def save(
-    df: pd.DataFrame,
+    dataframe: pd.DataFrame,
     name: str,
-    *,
-    savepoints_root: Path | str | None = None,
+    target_dir: Path | str | None = None,
 ) -> Path:
     """Save a dataframe into data/savepoints/<name>.parquet (overwrite)."""
 
-    savepoints_root = resolve_path(savepoints_root, DEFAULT_SAVEPOINT_ROOT)
-    ensure_dir(savepoints_root)
-    out = savepoints_root / f"{safe_save_name(name)}.parquet"
-    df.to_parquet(out, engine="pyarrow", compression="snappy", index=False)
-    return out
+    savepoints_dir = resolve_path(target_dir, DEFAULT_SAVEPOINTS_DIR)
+    ensure_dir(savepoints_dir)
+    target_file = savepoints_dir / f"{safe_save_name(name)}.parquet"
+    dataframe.to_parquet(
+        target_file,
+        engine="pyarrow",
+        compression="snappy",
+        index=False,
+    )
+    return target_file

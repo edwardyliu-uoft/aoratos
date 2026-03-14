@@ -4,16 +4,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from .constants import DEFAULT_COMPRESSED_ROOT, DEFAULT_SAVEPOINT_ROOT
-from .constants import DEFAULT_TEST_ROOT, DEFAULT_TRAIN_ROOT
+from .constants import DEFAULT_DATA_DIR
 from .errors import DataAmbiguityError, DataNotFoundError
-from .paths import resolve_path
 
 
-def read_parquet_dir(path: Path) -> pd.DataFrame:
-    parquet_files = sorted(path.glob("*.parquet"))
+def read_parquet_dir(dir: Path) -> pd.DataFrame:
+    parquet_files = sorted(dir.glob("*.parquet"))
     if not parquet_files:
-        raise DataNotFoundError(f"Directory {path} contains no parquet files")
+        raise DataNotFoundError(f"Directory {dir} contains no parquet files")
     if len(parquet_files) == 1:
         return pd.read_parquet(parquet_files[0])
     frames = [pd.read_parquet(p) for p in parquet_files]
@@ -30,30 +28,20 @@ def find_parquet_matches(root: Path, name: str) -> list[Path]:
 
 def read(
     name: str,
-    source: str = "compressed",
-    *,
-    compressed_root: Path | str | None = None,
-    savepoints_root: Path | str | None = None,
-    train_root: Path | str | None = None,
-    test_root: Path | str | None = None,
+    source: str,
 ) -> pd.DataFrame:
     """Read parquet datasets by logical name from supported source roots."""
 
     if source not in {"compressed", "savepoints", "train", "test"}:
         raise ValueError("source must be one of: compressed, savepoints, train, test")
 
-    compressed_root = resolve_path(compressed_root, DEFAULT_COMPRESSED_ROOT)
-    savepoints_root = resolve_path(savepoints_root, DEFAULT_SAVEPOINT_ROOT)
-    train_root = resolve_path(train_root, DEFAULT_TRAIN_ROOT)
-    test_root = resolve_path(test_root, DEFAULT_TEST_ROOT)
-
-    source_roots = {
-        "compressed": compressed_root,
-        "savepoints": savepoints_root,
-        "train": train_root,
-        "test": test_root,
+    roots = {
+        "compressed": DEFAULT_DATA_DIR / "compressed",
+        "savepoints": DEFAULT_DATA_DIR / "savepoints",
+        "train": DEFAULT_DATA_DIR / "train",
+        "test": DEFAULT_DATA_DIR / "test",
     }
-    root = source_roots[source]
+    root = roots[source]
 
     direct = root / name
     if direct.exists() and direct.is_dir():
