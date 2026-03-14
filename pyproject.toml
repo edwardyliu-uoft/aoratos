@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 authors = [{ name = "arslyte", email = "arslyte@gmail.com" }]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["kaggle", "pandas", "pyarrow", "tqdm"]
+
+[dependency-groups]
+dev = ["pytest"]
 
 [build-system]
 requires = ["uv_build>=0.10.9,<0.11.0"]

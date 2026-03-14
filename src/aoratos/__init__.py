@@ -1,2 +1,3 @@
-def hello() -> str:
-    return "Hello from aoratos!"
+from . import data
+
+__all__ = ["data"]

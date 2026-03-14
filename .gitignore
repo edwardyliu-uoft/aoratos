@@ -214,3 +214,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Aoratos data artifacts
+data/raw/
+data/compressed/
+data/train/
+data/test/
+data/savepoints/
