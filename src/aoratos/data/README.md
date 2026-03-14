@@ -67,12 +67,16 @@ print(summary["train_path"], summary["test_path"])
 
 - `compressed`: maps to `data/compressed`
 - `savepoints`: maps to `data/savepoints`
+- `train`: maps to `data/train`
+- `test`: maps to `data/test`
 
 Examples:
 
 - `read("ratings", source="compressed")` reads all ratings parts from `data/compressed/ratings/`
 - `read("ratings_part_000", source="compressed")` reads one matching file
 - `read("checkpoint", source="savepoints")` reads `data/savepoints/checkpoint.parquet`
+- `read("train", source="train")` reads `data/train/train.parquet`
+- `read("test", source="test")` reads `data/test/test.parquet`
 
 ## Build Behavior
 

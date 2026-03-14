@@ -49,3 +49,23 @@ def test_read_folder_precedence_and_errors(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         read("ratings", source="invalid", compressed_root=root)
+
+
+def test_read_train_and_test_sources(tmp_path: Path) -> None:
+    train_root = tmp_path / "train"
+    test_root = tmp_path / "test"
+    train_root.mkdir(parents=True)
+    test_root.mkdir(parents=True)
+
+    pd.DataFrame({"movie_id": [1], "customer_id": [10]}).to_parquet(
+        train_root / "train.parquet", index=False
+    )
+    pd.DataFrame({"movie_id": [2], "customer_id": [20]}).to_parquet(
+        test_root / "test.parquet", index=False
+    )
+
+    train_df = read("train", source="train", train_root=train_root)
+    test_df = read("test", source="test", test_root=test_root)
+
+    assert train_df["movie_id"].tolist() == [1]
+    assert test_df["movie_id"].tolist() == [2]

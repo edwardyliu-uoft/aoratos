@@ -62,7 +62,7 @@ def test_full_flow_download_compress_build_read_build(
         compressed_root=compressed_root, out_dir=train_root, force=True
     )
     assert (train_root / "train.parquet").exists()
-    assert {"movie_id", "customer_id", "date", "year", "title"}.issubset(
+    assert {"movie_id", "customer_id", "date", "rating", "year", "title"}.issubset(
         train_df.columns
     )
 
@@ -70,7 +70,9 @@ def test_full_flow_download_compress_build_read_build(
         compressed_root=compressed_root, out_dir=test_root, force=True
     )
     assert (test_root / "test.parquet").exists()
-    assert {"movie_id", "customer_id", "year", "title"}.issubset(test_df.columns)
+    assert {"movie_id", "customer_id", "date", "rating", "year", "title"}.issubset(
+        test_df.columns
+    )
 
     ckpt_1 = pd.DataFrame({"value": [1]})
     ckpt_2 = pd.DataFrame({"value": [2]})

@@ -9,7 +9,7 @@ from aoratos.data.builders import build_test, build_train
 
 def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
     compressed = tmp_path / "compressed"
-    compressed.mkdir()
+    (compressed / "ratings").mkdir(parents=True)
     pd.DataFrame([{"movie_id": 1, "customer_id": 10, "date": "2005-01-01"}]).to_parquet(
         compressed / "qualifying.parquet", index=False
     )
@@ -19,6 +19,12 @@ def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
     pd.DataFrame([{"movie_id": 1, "year": 2001, "title": "Movie One"}]).to_parquet(
         compressed / "movies.parquet", index=False
     )
+    pd.DataFrame(
+        [
+            {"movie_id": 1, "customer_id": 10, "rating": 5, "date": "2005-01-01"},
+            {"movie_id": 1, "customer_id": 11, "rating": 4, "date": "2005-01-02"},
+        ]
+    ).to_parquet(compressed / "ratings" / "ratings_part_000.parquet", index=False)
 
     train_out = tmp_path / "train"
     test_out = tmp_path / "test"
@@ -27,10 +33,12 @@ def test_build_train_and_test_from_parquet(tmp_path: Path) -> None:
 
     assert (train_out / "train.parquet").exists()
     assert (test_out / "test.parquet").exists()
-    assert {"movie_id", "customer_id", "date", "year", "title"}.issubset(
+    assert {"movie_id", "customer_id", "date", "rating", "year", "title"}.issubset(
         train_df.columns
     )
-    assert {"movie_id", "customer_id", "year", "title"}.issubset(test_df.columns)
+    assert {"movie_id", "customer_id", "date", "rating", "year", "title"}.issubset(
+        test_df.columns
+    )
 
 
 def test_builders_fallback_to_raw_and_idempotent(
@@ -48,3 +56,25 @@ def test_builders_fallback_to_raw_and_idempotent(
     first = build_train(compressed_root=compressed, out_dir=train_out, force=True)
     second = build_train(compressed_root=compressed, out_dir=train_out, force=False)
     assert len(first) == len(second)
+
+
+def test_build_train_matches_ratings_when_date_dtype_differs(tmp_path: Path) -> None:
+    compressed = tmp_path / "compressed"
+    (compressed / "ratings").mkdir(parents=True)
+
+    pd.DataFrame(
+        [{"movie_id": 1, "customer_id": 10, "date": pd.Timestamp("2005-01-01")}]
+    ).to_parquet(compressed / "qualifying.parquet", index=False)
+    pd.DataFrame(
+        [{"movie_id": 1, "year": 2001, "title": "Movie One"}]
+    ).to_parquet(compressed / "movies.parquet", index=False)
+    pd.DataFrame(
+        [{"movie_id": 1, "customer_id": 10, "rating": 5, "date": "2005-01-01"}]
+    ).to_parquet(compressed / "ratings" / "ratings_part_000.parquet", index=False)
+
+    out_dir = tmp_path / "train"
+    train_df = build_train(compressed_root=compressed, out_dir=out_dir, force=True)
+
+    assert train_df.shape[0] == 1
+    assert train_df["rating"].isnull().sum() == 0
+    assert int(train_df.loc[0, "rating"]) == 5

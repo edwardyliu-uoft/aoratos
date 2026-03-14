@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from .constants import DEFAULT_COMPRESSED_ROOT, DEFAULT_SAVEPOINT_ROOT
+from .constants import DEFAULT_TEST_ROOT, DEFAULT_TRAIN_ROOT
 from .errors import DataAmbiguityError, DataNotFoundError
 from .paths import resolve_path
 
@@ -33,15 +34,26 @@ def read(
     *,
     compressed_root: Path | str | None = None,
     savepoints_root: Path | str | None = None,
+    train_root: Path | str | None = None,
+    test_root: Path | str | None = None,
 ) -> pd.DataFrame:
-    """Read parquet datasets by logical name from compressed or savepoints roots."""
+    """Read parquet datasets by logical name from supported source roots."""
 
-    if source not in {"compressed", "savepoints"}:
-        raise ValueError("source must be one of: compressed, savepoints")
+    if source not in {"compressed", "savepoints", "train", "test"}:
+        raise ValueError("source must be one of: compressed, savepoints, train, test")
 
     compressed_root = resolve_path(compressed_root, DEFAULT_COMPRESSED_ROOT)
     savepoints_root = resolve_path(savepoints_root, DEFAULT_SAVEPOINT_ROOT)
-    root = compressed_root if source == "compressed" else savepoints_root
+    train_root = resolve_path(train_root, DEFAULT_TRAIN_ROOT)
+    test_root = resolve_path(test_root, DEFAULT_TEST_ROOT)
+
+    source_roots = {
+        "compressed": compressed_root,
+        "savepoints": savepoints_root,
+        "train": train_root,
+        "test": test_root,
+    }
+    root = source_roots[source]
 
     direct = root / name
     if direct.exists() and direct.is_dir():

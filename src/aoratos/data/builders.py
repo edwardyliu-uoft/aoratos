@@ -16,6 +16,7 @@ from .constants import (
 from .download import download
 from .parsers import iter_movie_blocks, read_movies_csv
 from .paths import default_raw_root_from_compressed, ensure_dir, resolve_path
+from .reader import read as read_dataset
 from .savepoints import save
 
 
@@ -26,6 +27,60 @@ def read_with_fallback(
     if parquet_path.exists():
         return pd.read_parquet(parquet_path)
     return fallback_loader()
+
+
+def _normalize_join_columns(df: pd.DataFrame, join_cols: list[str]) -> pd.DataFrame:
+    normalized = df.copy()
+    for col in join_cols:
+        if col in {"movie_id", "customer_id"} and col in normalized.columns:
+            normalized[col] = pd.to_numeric(normalized[col], errors="coerce").astype("Int64")
+        elif col == "date" and col in normalized.columns:
+            parsed = pd.to_datetime(normalized[col], errors="coerce")
+            formatted = parsed.dt.strftime("%Y-%m-%d")
+            normalized[col] = formatted.fillna(normalized[col].astype("string")).astype(
+                "string"
+            )
+    return normalized
+
+
+def _read_ratings_from_raw(
+    raw_root: Path,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+
+    for combined_file in sorted(raw_root.glob("combined_data_*.txt")):
+        for rec in iter_movie_blocks(combined_file, has_rating=True, has_date=True):
+            rows.append(
+                {
+                    "movie_id": rec.movie_id,
+                    "customer_id": rec.customer_id,
+                    "date": rec.date,
+                    "rating": rec.rating,
+                }
+            )
+
+    if not rows:
+        return pd.DataFrame(columns=["movie_id", "customer_id", "date", "rating"])
+
+    return pd.DataFrame(rows)
+
+
+def _read_full_ratings(
+    compressed_root: Path,
+    fallback_raw_root: Path,
+) -> pd.DataFrame:
+    ratings_dir = compressed_root / "ratings"
+    if ratings_dir.exists():
+        try:
+            return read_dataset(
+                "ratings",
+                source="compressed",
+                compressed_root=compressed_root,
+            )
+        except Exception:
+            # Fall through to raw parsing if compressed ratings are unavailable/corrupt.
+            pass
+    return _read_ratings_from_raw(fallback_raw_root)
 
 
 def build_train(
@@ -63,12 +118,26 @@ def build_train(
             ]
         ),
     )
+    qualifying_df = _normalize_join_columns(
+        qualifying_df,
+        ["movie_id", "customer_id", "date"],
+    )
+    ratings_df = _normalize_join_columns(
+        _read_full_ratings(compressed_root, fallback_raw_root),
+        ["movie_id", "customer_id", "date"],
+    )
     movies_df = read_with_fallback(
         compressed_root / "movies.parquet",
         lambda: read_movies_csv(fallback_raw_root / "movie_titles.csv"),
     )
 
-    train_df = qualifying_df.merge(movies_df, on="movie_id", how="left", sort=False)
+    train_df = qualifying_df.merge(
+        ratings_df[["movie_id", "customer_id", "date", "rating"]],
+        on=["movie_id", "customer_id", "date"],
+        how="left",
+        sort=False,
+    )
+    train_df = train_df.merge(movies_df, on="movie_id", how="left", sort=False)
     train_df.to_parquet(out_file, engine="pyarrow", compression="snappy", index=False)
     return train_df
 
@@ -107,12 +176,26 @@ def build_test(
             ]
         ),
     )
+    probe_df = _normalize_join_columns(
+        probe_df,
+        ["movie_id", "customer_id"],
+    )
+    ratings_df = _normalize_join_columns(
+        _read_full_ratings(compressed_root, fallback_raw_root),
+        ["movie_id", "customer_id", "date"],
+    )
     movies_df = read_with_fallback(
         compressed_root / "movies.parquet",
         lambda: read_movies_csv(fallback_raw_root / "movie_titles.csv"),
     )
 
-    test_df = probe_df.merge(movies_df, on="movie_id", how="left", sort=False)
+    test_df = probe_df.merge(
+        ratings_df[["movie_id", "customer_id", "date", "rating"]],
+        on=["movie_id", "customer_id"],
+        how="left",
+        sort=False,
+    )
+    test_df = test_df.merge(movies_df, on="movie_id", how="left", sort=False)
     test_df.to_parquet(out_file, engine="pyarrow", compression="snappy", index=False)
     return test_df
 
