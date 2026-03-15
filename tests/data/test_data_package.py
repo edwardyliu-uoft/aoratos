@@ -104,7 +104,9 @@ def test_full_flow_download_compress_build_read_build(
     assert not build_test_df.empty
 
 
-def test_read_ambiguity_and_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_read_ambiguity_and_not_found(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
 
     compressed_root = tmp_path / "compressed"
