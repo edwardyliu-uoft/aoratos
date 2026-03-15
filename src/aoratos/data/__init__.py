@@ -5,6 +5,7 @@ from .compress import compress
 from .download import download
 from .reader import read
 from .savepoints import save
+from .supplement import supplement
 
 __all__ = [
     "download",
@@ -14,4 +15,5 @@ __all__ = [
     "build_test",
     "save",
     "build",
+    "supplement",
 ]

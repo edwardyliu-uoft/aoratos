@@ -15,3 +15,23 @@ class DataAmbiguityError(DataError):
 
 class UnsafeNameError(DataError):
     """Raised when a provided savepoint name is unsafe."""
+
+
+class SupplementConfigurationError(DataError):
+    """Raised when supplement runtime configuration is invalid."""
+
+
+class SupplementInternalError(DataError):
+    """Raised for unexpected internal supplement control-flow failures."""
+
+
+class SupplementSchemaError(DataError):
+    """Raised when supplement source data does not match required schema."""
+
+
+class TMDBAuthenticationError(SupplementConfigurationError):
+    """Raised when TMDB_API_KEY is missing for supplement execution."""
+
+
+class TMDBRequestError(DataError):
+    """Raised when TMDB request handling fails terminally."""

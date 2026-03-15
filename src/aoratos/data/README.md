@@ -17,6 +17,7 @@ Public API exports:
 - `build_test`
 - `build`
 - `save`
+- `supplement`
 
 ## Requirements
 
@@ -41,6 +42,26 @@ Example (bash):
 
 ```bash
 export KAGGLE_API_TOKEN="<your-kaggle-api-token>"
+```
+
+## Important: TMDB key required for metadata enrichment
+
+`supplement()` requires `TMDB_API_KEY` to be set.
+
+If `TMDB_API_KEY` is missing, `supplement()` raises `DataError` with:
+
+`TMDB API key is missing. Set TMDB_API_KEY before running supplement().`
+
+Example (PowerShell):
+
+```powershell
+$env:TMDB_API_KEY = "<your-tmdb-api-key>"
+```
+
+Example (bash):
+
+```bash
+export TMDB_API_KEY="<your-tmdb-api-key>"
 ```
 
 ## Default directories
@@ -182,9 +203,60 @@ train = data.read("train", "train")
 data.save(train.head(10_000), "train_head")
 ```
 
+## Supplement: movie metadata enrichment
+
+```python
+from aoratos import data
+
+metadata = data.supplement(
+	source_dir="data/compressed",
+	target_dir="data/savepoints",
+	force=False,
+	resume=True,
+)
+
+print(metadata.shape)
+```
+
+Output file:
+
+- `data/savepoints/movies_metadata.parquet`
+
+This output is the enriched replacement metadata table for the original `movies.parquet` table, preserving `movie_id`, `title`, and `year` while adding TMDB fields.
+
+No-match behavior:
+
+- If TMDB returns no search results, the row still keeps source `title` and `year`; only TMDB-derived fields (`tmdb_id`, `genre`, `description`, `director`, `actor`) remain null.
+- If TMDB returns any candidates, `supplement()` selects the highest-likelihood candidate deterministically.
+
+Progress behavior:
+
+- `supplement()` emits periodic progress and checkpoint logs during long runs so users can confirm the pipeline is still advancing.
+
+Output columns:
+
+- `movie_id`
+- `tmdb_id`
+- `title`
+- `year`
+- `genre`
+- `description`
+- `director`
+- `actor`
+
+Implementation notes:
+
+- `supplement()` uses shared defaults from `aoratos.data.constants` (TMDB URL, throttle/retry defaults, matching thresholds, source/target defaults).
+- Supplement-specific exception classes are centralized in `aoratos.data.errors` and used by `supplement()`.
+
 ## Error behavior at a glance
 
 - `DataError`: generic data pipeline errors (including missing `KAGGLE_API_TOKEN` for download)
 - `DataNotFoundError`: expected files/datasets were not found
 - `DataAmbiguityError`: `read()` matched more than one dataset for a name
 - `UnsafeNameError`: unsafe savepoint name passed to `save()`
+- `SupplementConfigurationError`: invalid supplement runtime configuration
+- `TMDBAuthenticationError`: `TMDB_API_KEY` not set for supplement
+- `DataNotFoundError`: supplement source parquet missing
+- `SupplementSchemaError`: source schema missing required supplement columns
+- `TMDBRequestError`: terminal TMDB API/network failure after bounded retries

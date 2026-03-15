@@ -12,7 +12,6 @@ from .constants import (
 )
 from .errors import DataNotFoundError
 from .parsers import (
-    ParsedKVRecord,
     ParsedRatingRecord,
     iterate_kv,
     iterate_ratings,
