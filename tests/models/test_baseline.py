@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+
+import aoratos.data as data
+from aoratos.models import BaseModel
+from aoratos.models.baseline import BaselineCFModel
+from aoratos.models.errors import ModelNotFittedError, SchemaValidationError
+
+
+def _tiny_train_df() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10, "rating": 5.0},
+            {"customer_id": 1, "movie_id": 20, "rating": 4.0},
+            {"customer_id": 2, "movie_id": 10, "rating": 3.0},
+            {"customer_id": 2, "movie_id": 20, "rating": 2.0},
+            {"customer_id": 3, "movie_id": 10, "rating": 4.0},
+            {"customer_id": 3, "movie_id": 20, "rating": 3.0},
+        ]
+    )
+
+
+def test_baseline_inherits_base_model() -> None:
+    model = BaselineCFModel()
+    assert isinstance(model, BaseModel)
+
+
+def test_fit_predict_score_is_deterministic_and_clipped() -> None:
+    train_df = _tiny_train_df()
+
+    model_a = BaselineCFModel(reg_user=0.1, reg_movie=0.1, n_iters=20)
+    model_b = BaselineCFModel(reg_user=0.1, reg_movie=0.1, n_iters=20)
+
+    model_a.fit(train_df.drop(columns=["rating"]), train_df["rating"])
+    model_b.fit(train_df.drop(columns=["rating"]), train_df["rating"])
+
+    predict_X = pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10},
+            {"customer_id": 2, "movie_id": 20},
+            {"customer_id": 999, "movie_id": 10},
+            {"customer_id": 1, "movie_id": 999},
+        ]
+    )
+
+    pred_a = model_a.predict(predict_X)
+    pred_b = model_b.predict(predict_X)
+
+    assert pred_a.shape == (4,)
+    assert np.allclose(pred_a, pred_b)
+    assert np.all(pred_a >= model_a.rating_min)
+    assert np.all(pred_a <= model_a.rating_max)
+
+    metrics = model_a.score(train_df.drop(columns=["rating"]), train_df["rating"])
+    assert set(metrics) == {
+        "rmse",
+        "mae",
+        "precision",
+        "recall",
+        "accuracy",
+        "n_samples",
+    }
+    assert metrics["n_samples"] == 6.0
+    assert metrics["rmse"] < 0.35
+    assert metrics["mae"] < 0.35
+
+
+def test_baseline_score_uses_universal_metrics() -> None:
+    frame = pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10, "rating": 5.0},
+            {"customer_id": 1, "movie_id": 11, "rating": 4.0},
+            {"customer_id": 2, "movie_id": 10, "rating": 3.0},
+            {"customer_id": 2, "movie_id": 11, "rating": 2.0},
+        ]
+    )
+
+    model = BaselineCFModel(n_iters=10)
+    model.fit(frame)
+
+    metrics = model.score(frame.drop(columns=["rating"]), frame["rating"])
+    assert set(metrics) == {
+        "rmse",
+        "mae",
+        "precision",
+        "recall",
+        "accuracy",
+        "n_samples",
+    }
+    assert metrics["rmse"] >= 0.0
+    assert metrics["mae"] >= 0.0
+
+
+def test_score_accepts_rating_in_test_X_when_test_y_omitted() -> None:
+    train_df = _tiny_train_df()
+    model = BaselineCFModel()
+    model.fit(train_df)
+
+    metrics = model.score(train_df.drop(columns=["rating"]), train_df["rating"])
+    assert metrics["rmse"] >= 0.0
+    assert metrics["mae"] >= 0.0
+
+
+def test_invalid_input_contracts_raise_schema_errors() -> None:
+    model = BaselineCFModel()
+    good_X = pd.DataFrame({"customer_id": [1, 2], "movie_id": [10, 20]})
+
+    with pytest.raises(SchemaValidationError):
+        model.fit(pd.DataFrame({"customer_id": [1]}), pd.Series([4.0]))
+
+    with pytest.raises(SchemaValidationError):
+        model.fit(good_X, pd.Series([4.0]))
+
+    with pytest.raises(SchemaValidationError):
+        model.fit(good_X, pd.Series([4.0, np.nan]))
+
+
+def test_predict_before_fit_raises() -> None:
+    model = BaselineCFModel()
+    with pytest.raises(ModelNotFittedError):
+        model.predict(pd.DataFrame({"customer_id": [1], "movie_id": [1]}))
+
+
+def test_works_with_existing_data_read_interface(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("aoratos.data.reader.DEFAULT_DATA_DIR", tmp_path)
+
+    train_dir = tmp_path / "train"
+    test_dir = tmp_path / "test"
+    train_dir.mkdir(parents=True)
+    test_dir.mkdir(parents=True)
+
+    train_df = pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10, "rating": 5.0},
+            {"customer_id": 1, "movie_id": 20, "rating": 3.0},
+            {"customer_id": 2, "movie_id": 10, "rating": 4.0},
+            {"customer_id": 2, "movie_id": 20, "rating": 2.0},
+        ]
+    )
+    test_df = pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10, "rating": 5.0},
+            {"customer_id": 2, "movie_id": 20, "rating": 2.0},
+        ]
+    )
+
+    train_df.to_parquet(train_dir / "train.parquet", index=False)
+    test_df.to_parquet(test_dir / "test.parquet", index=False)
+
+    loaded_train = data.read("train", source="train")
+    loaded_test = data.read("test", source="test")
+
+    model = BaselineCFModel()
+    model.fit(loaded_train)
+    metrics = model.score(loaded_test.drop(columns=["rating"]), loaded_test["rating"])
+
+    assert metrics["rmse"] >= 0.0
+    assert metrics["mae"] >= 0.0
