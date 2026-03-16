@@ -56,7 +56,10 @@ def test_fit_predict_score_is_deterministic_and_clipped() -> None:
     assert np.all(pred_a >= model_a.rating_min)
     assert np.all(pred_a <= model_a.rating_max)
 
-    metrics = model_a.score(train_df.drop(columns=["rating"]), train_df["rating"])
+    train_X = train_df.drop(columns=["rating"])
+    train_y = train_df["rating"]
+    train_pred = model_a.predict(train_X)
+    metrics = model_a.score(y_true=train_y, y_pred=train_pred)
     assert set(metrics) == {
         "rmse",
         "mae",
@@ -83,7 +86,10 @@ def test_baseline_score_uses_universal_metrics() -> None:
     model = BaselineCFModel(n_iters=10)
     model.fit(frame)
 
-    metrics = model.score(frame.drop(columns=["rating"]), frame["rating"])
+    frame_X = frame.drop(columns=["rating"])
+    frame_y = frame["rating"]
+    frame_pred = model.predict(frame_X)
+    metrics = model.score(y_true=frame_y, y_pred=frame_pred)
     assert set(metrics) == {
         "rmse",
         "mae",
@@ -96,12 +102,15 @@ def test_baseline_score_uses_universal_metrics() -> None:
     assert metrics["mae"] >= 0.0
 
 
-def test_score_accepts_rating_in_test_X_when_test_y_omitted() -> None:
+def test_score_accepts_explicit_y_true_and_y_pred() -> None:
     train_df = _tiny_train_df()
     model = BaselineCFModel()
     model.fit(train_df)
 
-    metrics = model.score(train_df.drop(columns=["rating"]), train_df["rating"])
+    train_X = train_df.drop(columns=["rating"])
+    train_y = train_df["rating"]
+    train_pred = model.predict(train_X)
+    metrics = model.score(y_true=train_y, y_pred=train_pred)
     assert metrics["rmse"] >= 0.0
     assert metrics["mae"] >= 0.0
 
@@ -160,7 +169,10 @@ def test_works_with_existing_data_read_interface(
 
     model = BaselineCFModel()
     model.fit(loaded_train)
-    metrics = model.score(loaded_test.drop(columns=["rating"]), loaded_test["rating"])
+    test_X = loaded_test.drop(columns=["rating"])
+    test_y = loaded_test["rating"]
+    test_pred = model.predict(test_X)
+    metrics = model.score(y_true=test_y, y_pred=test_pred)
 
     assert metrics["rmse"] >= 0.0
     assert metrics["mae"] >= 0.0

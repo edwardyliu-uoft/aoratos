@@ -30,7 +30,8 @@ def test_base_model_accepts_custom_name() -> None:
 
 def test_base_score_uses_evaluate_regression() -> None:
     model = _TestModel().fit(X=[1.0, 2.0, 3.0])
-    metrics = model.score(X=[1.0, 2.0, 3.0], y=[1.0, 2.0, 3.0])
+    y_pred = model.predict([1.0, 2.0, 3.0])
+    metrics = model.score(y_true=[1.0, 2.0, 3.0], y_pred=y_pred)
 
     assert set(metrics) == {
         "rmse",

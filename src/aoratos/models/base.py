@@ -34,16 +34,16 @@ class BaseModel(ABC):
 
     def score(
         self,
-        X: DataFrameLike,
-        y: ArrayLike1D | None = None,
+        y_true: ArrayLike1D,
+        y_pred: ArrayLike1D,
         *,
         include_n_samples: bool = True,
         **kwargs,
     ) -> MetricsDict:
         """Evaluate predictions using universal regression metrics."""
 
-        y_true = self._coerce_1d_array(y, name="y_true")
-        y_pred = self._coerce_1d_array(self.predict(X, **kwargs), name="y_pred")
+        y_true = self._coerce_1d_array(y_true, name="y_true")
+        y_pred = self._coerce_1d_array(y_pred, name="y_pred")
         return evaluate_regression(
             y_true,
             y_pred,
