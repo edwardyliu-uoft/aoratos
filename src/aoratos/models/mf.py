@@ -34,6 +34,8 @@ class MatrixFactorizationModel(BaseModel):
     reg: float = 0.02
     reg_bias: float = 0.01
     n_epochs: int = 10
+    max_samples_per_epoch: int | None = 2_000_000
+    track_train_rmse: bool = False
     use_time_bias: bool = True
     time_bin_freq: str = "M"
     clip_predictions: bool = True
@@ -71,6 +73,8 @@ class MatrixFactorizationModel(BaseModel):
             raise ValueError("n_factors must be >= 1")
         if self.n_epochs < 1:
             raise ValueError("n_epochs must be >= 1")
+        if self.max_samples_per_epoch is not None and self.max_samples_per_epoch < 1:
+            raise ValueError("max_samples_per_epoch must be >= 1 when provided")
         if self.lr <= 0:
             raise ValueError("lr must be > 0")
         if self.reg < 0 or self.reg_bias < 0:
@@ -228,7 +232,7 @@ class MatrixFactorizationModel(BaseModel):
         # Validate schema early to fail fast on missing columns/empty data.
         self._validate_X(X, require_date=self.use_time_bias)
         # Resolve supervised target from explicit y or X["rating"].
-        ratings = self._validate_resolve_y(X, y)
+        ratings = self._validate_resolve_y(X, y).astype(np.float32, copy=False)
 
         # Extract raw ids and compute global mean baseline term.
         user_ids = X[self.user_column].to_numpy()
@@ -255,11 +259,15 @@ class MatrixFactorizationModel(BaseModel):
         # Use one RNG for both parameter initialization and epoch shuffling for determinism.
         rng = np.random.default_rng(self.random_state)
         # Initialize additive bias terms at zero.
-        self._user_biases = np.zeros(n_users, dtype=float)
-        self._movie_biases = np.zeros(n_movies, dtype=float)
+        self._user_biases = np.zeros(n_users, dtype=np.float32)
+        self._movie_biases = np.zeros(n_movies, dtype=np.float32)
         # Initialize latent factors with small random values to break symmetry.
-        self._user_factors = rng.normal(0.0, 0.1, size=(n_users, self.n_factors))
-        self._movie_factors = rng.normal(0.0, 0.1, size=(n_movies, self.n_factors))
+        self._user_factors = rng.normal(
+            0.0, 0.1, size=(n_users, self.n_factors)
+        ).astype(np.float32)
+        self._movie_factors = rng.normal(
+            0.0, 0.1, size=(n_movies, self.n_factors)
+        ).astype(np.float32)
 
         # Keep sparse time-bias state in dicts because only observed (entity, time) pairs matter.
         self._user_time_biases = {}
@@ -277,6 +285,12 @@ class MatrixFactorizationModel(BaseModel):
         for _ in range(self.n_epochs):
             # Shuffle rows each epoch to reduce cyclic update bias in SGD.
             shuffled = rng.permutation(indices)
+            if (
+                self.max_samples_per_epoch is not None
+                and self.max_samples_per_epoch < n_samples
+            ):
+                shuffled = shuffled[: self.max_samples_per_epoch]
+
             for idx in shuffled:
                 # Read one observed interaction.
                 u = int(user_codes[idx])
@@ -320,14 +334,15 @@ class MatrixFactorizationModel(BaseModel):
                     error=err,
                 )
 
-            # Evaluate train RMSE at end of epoch with chunking to avoid huge arrays.
-            epoch_rmse = self._compute_rmse_chunked(
-                user_codes=user_codes,
-                movie_codes=movie_codes,
-                time_codes=time_codes,
-                ratings=ratings,
-            )
-            self.train_rmse_history.append(epoch_rmse)
+            # RMSE tracking can be disabled to reduce training runtime on large datasets.
+            if self.track_train_rmse:
+                epoch_rmse = self._compute_rmse_chunked(
+                    user_codes=user_codes[shuffled],
+                    movie_codes=movie_codes[shuffled],
+                    time_codes=time_codes[shuffled],
+                    ratings=ratings[shuffled],
+                )
+                self.train_rmse_history.append(epoch_rmse)
 
         self.fitted = True
         return self
@@ -345,7 +360,7 @@ class MatrixFactorizationModel(BaseModel):
         """
 
         # Start from global mean so every row has a valid fallback prediction.
-        predictions = np.full(user_codes.shape[0], self._mu, dtype=float)
+        predictions = np.full(user_codes.shape[0], self._mu, dtype=np.float32)
 
         # Mark which entities are known from training; unknowns skip their specific terms.
         known_users = user_codes >= 0

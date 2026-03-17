@@ -221,3 +221,4 @@ data/compressed/
 data/train/
 data/test/
 data/savepoints/
+data/models/

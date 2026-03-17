@@ -109,6 +109,7 @@ def test_mf_train_rmse_trend_improves() -> None:
     model = MatrixFactorizationModel(
         n_factors=10,
         n_epochs=14,
+        track_train_rmse=True,
         lr=0.012,
         reg=0.02,
         reg_bias=0.01,
