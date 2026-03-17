@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -12,6 +14,14 @@ class _TestModel(BaseModel):
 
     def predict(self, X, **kwargs) -> np.ndarray:
         return np.asarray(X, dtype=float)
+
+    def save(self, path: Path | str | None = None) -> Path:
+        return Path(path) if path is not None else Path("dummy.pkl")
+
+    @classmethod
+    def load(cls, path: Path | str | None = None, **kwargs) -> "_TestModel":
+        _ = path
+        return cls()
 
 
 def test_base_model_has_default_name() -> None:

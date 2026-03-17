@@ -9,6 +9,7 @@ from .errors import (
     SchemaValidationError,
 )
 from .metrics import accuracy, evaluate_regression, mae, precision, recall, rmse
+from .mf import MatrixFactorizationModel
 from .preprocessing import cosine_similarity_matrix, scale_features
 from .types import ArrayLike1D, DataFrameLike, MetricsDict
 
@@ -16,6 +17,7 @@ __all__ = [
     "ArrayLike1D",
     "BaseModel",
     "BaselineCFModel",
+    "MatrixFactorizationModel",
     "BaselineModelError",
     "DataFrameLike",
     "MetricsDict",

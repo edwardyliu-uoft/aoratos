@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -31,6 +32,15 @@ class BaseModel(ABC):
     @abstractmethod
     def predict(self, X: DataFrameLike, **kwargs) -> np.ndarray:
         """Predict targets for rows in X."""
+
+    @abstractmethod
+    def save(self, path: Path | str | None = None) -> Path:
+        """Persist model state to disk and return the output path."""
+
+    @classmethod
+    @abstractmethod
+    def load(cls, path: Path | str | None = None, **kwargs) -> "BaseModel":
+        """Load model state from disk and return a model instance."""
 
     def score(
         self,

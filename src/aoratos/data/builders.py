@@ -24,7 +24,7 @@ def build_train(
     *,
     force: bool = False,
 ) -> pd.DataFrame:
-    """Build train dataset from qualifying + movie metadata."""
+    """Build train dataset from anti-probe + movie metadata."""
 
     source_dir = resolve_path(source_dir, DEFAULT_COMPRESSED_DIR)
     target_dir = resolve_path(target_dir, DEFAULT_TRAIN_DIR)

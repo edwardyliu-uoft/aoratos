@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import pickle
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from .base import BaseModel
+from .constants import DEFAULT_MODEL_DIR
 from .errors import ModelNotFittedError, SchemaValidationError
 from .types import ArrayLike1D, DataFrameLike
 
@@ -31,7 +34,6 @@ class BaselineCFModel(BaseModel):
     being strong enough to serve as a practical starting point for more advanced models.
     """
 
-    name: str = "CollaborativeFiltering"
     user_column: str = "customer_id"
     movie_column: str = "movie_id"
 
@@ -49,7 +51,7 @@ class BaselineCFModel(BaseModel):
     def __post_init__(self) -> None:
         """Validate hyperparameters and initialize internal state."""
 
-        BaseModel.__init__(self, name=self.name)
+        BaseModel.__init__(self, name="CollaborativeFiltering")
 
         if self.rating_min >= self.rating_max:
             raise ValueError("rating_min must be smaller than rating_max")
@@ -207,3 +209,62 @@ class BaselineCFModel(BaseModel):
             predictions = np.clip(predictions, self.rating_min, self.rating_max)
 
         return predictions
+
+    @classmethod
+    def _resolve_pkl(
+        cls,
+        *,
+        name: str | None = None,
+        path: Path | str | None = None,
+    ) -> Path:
+        candidate = Path(path) if path is not None else Path(name or cls().name)
+        if candidate.suffix == "":
+            candidate = candidate.with_suffix(".pkl")
+
+        if not candidate.is_absolute():
+            candidate = DEFAULT_MODEL_DIR / candidate
+
+        return candidate
+
+    def save(self, path: Path | str | None = None) -> Path:
+        """Serialize fitted model state to disk.
+
+        Default path: ``data/models/<name>.pkl``.
+        """
+
+        if not self.fitted:
+            raise ModelNotFittedError("fit must be called before save")
+
+        target_path = self._resolve_pkl(name=self.name, path=path)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with target_path.open("wb") as file:
+            pickle.dump(self, file)
+
+        return target_path
+
+    @classmethod
+    def load(
+        cls,
+        *,
+        name: str | None = None,
+        path: Path | str | None = None,
+    ) -> "BaselineCFModel":
+        """Load model state from disk.
+
+        Default path: ``data/models/<model_name>.pkl``.
+        """
+
+        source_path = cls._resolve_pkl(name=name, path=path)
+        if not source_path.exists():
+            raise FileNotFoundError(f"Saved model not found at {source_path}")
+
+        with source_path.open("rb") as file:
+            loaded = pickle.load(file)
+
+        if not isinstance(loaded, cls):
+            raise TypeError(
+                f"Loaded artifact type {type(loaded).__name__} does not match {cls.__name__}"
+            )
+
+        return loaded

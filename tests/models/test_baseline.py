@@ -9,6 +9,7 @@ import pytest
 import aoratos.data as data
 from aoratos.models import BaseModel
 from aoratos.models.baseline import BaselineCFModel
+from aoratos.models.constants import DEFAULT_MODEL_DIR
 from aoratos.models.errors import ModelNotFittedError, SchemaValidationError
 
 
@@ -133,6 +134,48 @@ def test_predict_before_fit_raises() -> None:
     model = BaselineCFModel()
     with pytest.raises(ModelNotFittedError):
         model.predict(pd.DataFrame({"customer_id": [1], "movie_id": [1]}))
+
+
+def test_save_before_fit_raises() -> None:
+    model = BaselineCFModel()
+    with pytest.raises(ModelNotFittedError):
+        model.save()
+
+
+def test_baseline_save_load_roundtrip(tmp_path: Path) -> None:
+    train_df = _tiny_train_df()
+    model = BaselineCFModel(reg_user=0.1, reg_movie=0.1, n_iters=20)
+    model.fit(train_df)
+
+    predict_X = pd.DataFrame(
+        [
+            {"customer_id": 1, "movie_id": 10},
+            {"customer_id": 999, "movie_id": 10},
+            {"customer_id": 1, "movie_id": 999},
+        ]
+    )
+    pred_before = model.predict(predict_X)
+
+    save_path = tmp_path / "models" / "baseline_roundtrip.pkl"
+    written_path = model.save(save_path)
+    loaded = BaselineCFModel.load(path=written_path)
+    pred_after = loaded.predict(predict_X)
+
+    assert written_path == save_path
+    assert written_path.exists()
+    assert np.allclose(pred_before, pred_after)
+
+
+def test_baseline_default_save_path_uses_data_models() -> None:
+    model = BaselineCFModel()
+    resolved = model._resolve_pkl(name="my_baseline")
+    assert resolved == DEFAULT_MODEL_DIR / "my_baseline.pkl"
+
+
+def test_baseline_relative_path_resolves_under_default_model_dir() -> None:
+    model = BaselineCFModel()
+    resolved = model._resolve_pkl(path="custom_name")
+    assert resolved == DEFAULT_MODEL_DIR / "custom_name.pkl"
 
 
 def test_works_with_existing_data_read_interface(
