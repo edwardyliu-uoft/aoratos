@@ -1,9 +1,9 @@
 [project]
 name = "aoratos"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Simple Python Recommender-System"
 readme = "README.md"
-authors = [{ name = "arslyte", email = "arslyte@gmail.com" }]
+authors = [{ name = "edwardyliu", email = "edwardy.liu@mail.utoronto.ca" }]
 requires-python = ">=3.12"
 dependencies = [
     "kaggle>=2.0.0",
