@@ -145,10 +145,10 @@ from aoratos import data
 
 # Requires TMDB_API_KEY
 movies_metadata = data.supplement(
-		source_file="data/compressed/movies.parquet",
-		target_file="data/savepoints/movies_metadata.parquet",
-		force=False,
-		resume=True,
+	source_file="data/compressed/movies.parquet",
+	target_file="data/savepoints/movies_metadata.parquet",
+	force=False,
+	resume=True,
 )
 print(movies_metadata.columns.tolist())
 ```
@@ -230,13 +230,13 @@ train_df = data.read("train", source="train")
 test_df = data.read("test", source="test")
 
 mf = MatrixFactorizationModel(
-		n_factors=64,
-		lr=0.01,
-		reg=0.02,
-		reg_bias=0.01,
-		n_epochs=10,
-		use_time_bias=True,
-		random_state=42,
+	n_factors=64,
+	lr=0.01,
+	reg=0.02,
+	reg_bias=0.01,
+	n_epochs=10,
+	use_time_bias=True,
+	random_state=42,
 )
 mf.fit(train_df)
 
@@ -274,4 +274,3 @@ pytest tests/models
 - `docs/supplement.md` — TMDB metadata enrichment plan
 - `src/aoratos/data/README.md` — detailed data module usage
 - `src/aoratos/models/README.md` — detailed models module usage
-
